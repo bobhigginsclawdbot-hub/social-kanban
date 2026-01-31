@@ -1,0 +1,22 @@
+{
+  "name": "social-kanban",
+  "version": "1.0.0",
+  "description": "Social Media Content Kanban Board for Ryan Tech Lab",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bobhigginsclawdbot-hub/social-kanban.git"
+  },
+  "keywords": ["kanban", "social-media", "content-management"],
+  "author": "Ryan Tech Lab",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^9.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  }
+}

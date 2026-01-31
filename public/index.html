@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ryan's Social Media Kanban</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header .stats {
+            display: flex;
+            gap: 15px;
+            font-size: 14px;
+            color: #888;
+            flex-wrap: wrap;
+        }
+
+        .header .stats span {
+            background: rgba(255,255,255,0.1);
+            padding: 5px 12px;
+            border-radius: 20px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #888;
+        }
+
+        .board-container {
+            overflow-x: auto;
+            padding-bottom: 20px;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: 200px repeat(5, 280px);
+            gap: 0;
+            min-width: max-content;
+        }
+
+        .column-headers {
+            display: contents;
+        }
+
+        .column-header {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            font-weight: 600;
+            text-align: center;
+            border-bottom: 2px solid;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .column-header:nth-child(1) { border-color: transparent; background: transparent; }
+        .column-header:nth-child(2) { border-color: #6366f1; }
+        .column-header:nth-child(3) { border-color: #f59e0b; }
+        .column-header:nth-child(4) { border-color: #8b5cf6; }
+        .column-header:nth-child(5) { border-color: #10b981; }
+        .column-header:nth-child(6) { border-color: #3b82f6; }
+
+        .swim-lane {
+            display: contents;
+        }
+
+        .lane-label {
+            background: rgba(255,255,255,0.03);
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 500;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            position: sticky;
+            left: 0;
+            z-index: 5;
+        }
+
+        .lane-label .icon {
+            font-size: 20px;
+        }
+
+        .lane-label .name {
+            font-size: 13px;
+        }
+
+        .lane-cell {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            min-height: 120px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .lane-cell:hover {
+            background: rgba(255,255,255,0.04);
+        }
+
+        .card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 12px;
+            cursor: grab;
+            transition: all 0.2s;
+            border-left: 3px solid;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .card.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+
+        .card-title {
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .card-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: #888;
+        }
+
+        .card-tag {
+            background: rgba(255,255,255,0.1);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+        }
+
+        .card[data-platform="x"] { border-left-color: #1da1f2; }
+        .card[data-platform="instagram"] { border-left-color: #e1306c; }
+        .card[data-platform="youtube"] { border-left-color: #ff0000; }
+        .card[data-platform="tiktok"] { border-left-color: #00f2ea; }
+        .card[data-platform="substack-ai"] { border-left-color: #ff6719; }
+        .card[data-platform="substack-rtl"] { border-left-color: #ff6719; }
+        .card[data-platform="medium"] { border-left-color: #00ab6c; }
+
+        .lane-x .lane-label { background: rgba(29, 161, 242, 0.1); }
+        .lane-instagram .lane-label { background: rgba(225, 48, 108, 0.1); }
+        .lane-youtube .lane-label { background: rgba(255, 0, 0, 0.1); }
+        .lane-tiktok .lane-label { background: rgba(0, 242, 234, 0.1); }
+        .lane-substack-ai .lane-label { background: rgba(255, 103, 25, 0.1); }
+        .lane-substack-rtl .lane-label { background: rgba(255, 103, 25, 0.1); }
+        .lane-medium .lane-label { background: rgba(0, 171, 108, 0.1); }
+
+        .add-card-btn {
+            background: transparent;
+            border: 2px dashed rgba(255,255,255,0.2);
+            border-radius: 8px;
+            padding: 10px;
+            color: rgba(255,255,255,0.4);
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+            width: 100%;
+            margin-top: auto;
+        }
+
+        .add-card-btn:hover {
+            border-color: rgba(255,255,255,0.4);
+            color: rgba(255,255,255,0.6);
+        }
+
+        .drop-zone {
+            flex: 1;
+            min-height: 60px;
+            border-radius: 8px;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .drop-zone.drag-over {
+            background: rgba(99, 102, 241, 0.2);
+            border: 2px dashed #6366f1;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: #1e1e2e;
+            border-radius: 12px;
+            padding: 24px;
+            width: 450px;
+            max-width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal h3 {
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+
+        .modal label {
+            display: block;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+
+        .modal input, .modal textarea, .modal select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .modal textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 10px;
+        }
+
+        .modal-buttons button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: #fff;
+        }
+
+        .context-menu {
+            display: none;
+            position: fixed;
+            background: #2d2d3d;
+            border-radius: 8px;
+            padding: 8px 0;
+            min-width: 150px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            z-index: 1001;
+        }
+
+        .context-menu.active {
+            display: block;
+        }
+
+        .context-menu button {
+            display: block;
+            width: 100%;
+            padding: 10px 16px;
+            text-align: left;
+            background: none;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .context-menu button:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .context-menu button.danger {
+            color: #ef4444;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #333;
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            z-index: 1002;
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast.success { background: #10b981; }
+        .toast.error { background: #ef4444; }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @media (max-width: 768px) {
+            .board {
+                grid-template-columns: 150px repeat(5, 220px);
+            }
+            .header h1 {
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 Ryan's Social Media Command Center</h1>
+        <div class="stats">
+            <span id="total-cards">0 items</span>
+            <span id="scheduled-count">0 scheduled</span>
+            <span id="published-count">0 published</span>
+        </div>
+    </div>
+
+    <div id="app">
+        <div class="loading">Loading...</div>
+    </div>
+
+    <div class="modal-overlay" id="modal">
+        <div class="modal">
+            <h3 id="modal-title">Add Content</h3>
+            <input type="hidden" id="card-id">
+            <input type="hidden" id="card-platform">
+            <input type="hidden" id="card-status">
+            
+            <label>Title / Content Idea</label>
+            <input type="text" id="card-title" placeholder="What's the content about?">
+            
+            <label>Description</label>
+            <textarea id="card-description" placeholder="Full content or notes..."></textarea>
+            
+            <label>Content Type</label>
+            <select id="card-type">
+                <option value="post">📝 Post</option>
+                <option value="thread">🧵 Thread</option>
+                <option value="video">🎬 Video</option>
+                <option value="story">📱 Story</option>
+                <option value="article">📄 Article</option>
+                <option value="newsletter">📰 Newsletter</option>
+            </select>
+            
+            <label>Scheduled Date</label>
+            <input type="date" id="card-date">
+            
+            <label>Priority</label>
+            <select id="card-priority">
+                <option value="low">🟢 Low</option>
+                <option value="medium" selected>🟡 Medium</option>
+                <option value="high">🔴 High</option>
+            </select>
+            
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveCard()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="context-menu" id="context-menu">
+        <button onclick="editCard()">✏️ Edit</button>
+        <button onclick="duplicateCard()">📋 Duplicate</button>
+        <button class="danger" onclick="deleteCard()">🗑️ Delete</button>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        let cards = [];
+        let currentCardId = null;
+        let draggedCard = null;
+
+        const platforms = [
+            { id: 'x', name: 'X / Twitter', icon: '𝕏' },
+            { id: 'instagram', name: 'Instagram', icon: '📸' },
+            { id: 'youtube', name: 'YouTube', icon: '▶️' },
+            { id: 'tiktok', name: 'TikTok', icon: '🎵' },
+            { id: 'substack-ai', name: 'SubStack<br><small>AInsights</small>', icon: '📰' },
+            { id: 'substack-rtl', name: 'SubStack<br><small>RyanTechLabs</small>', icon: '📰' },
+            { id: 'medium', name: 'Medium', icon: '📝' }
+        ];
+
+        const statuses = ['backlog', 'progress', 'review', 'scheduled', 'published'];
+
+        async function init() {
+            await loadCards();
+            renderBoard();
+            setupEventListeners();
+        }
+
+        async function loadCards() {
+            try {
+                const res = await fetch(`${API_BASE}/cards`);
+                cards = await res.json();
+                updateStats();
+            } catch (err) {
+                showToast('Failed to load cards', 'error');
+                cards = [];
+            }
+        }
+
+        function renderBoard() {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="board-container">
+                    <div class="board" id="board">
+                        <div class="column-headers">
+                            <div class="column-header"></div>
+                            <div class="column-header">📥 Backlog</div>
+                            <div class="column-header">✏️ In Progress</div>
+                            <div class="column-header">👀 Review</div>
+                            <div class="column-header">📅 Scheduled</div>
+                            <div class="column-header">✅ Published</div>
+                        </div>
+                        ${platforms.map(p => renderSwimLane(p)).join('')}
+                    </div>
+                </div>
+            `;
+            setupDragAndDrop();
+        }
+
+        function renderSwimLane(platform) {
+            return `
+                <div class="swim-lane lane-${platform.id}" data-platform="${platform.id}">
+                    <div class="lane-label">
+                        <span class="icon">${platform.icon}</span>
+                        <span class="name">${platform.name}</span>
+                    </div>
+                    ${statuses.map(status => renderCell(platform.id, status)).join('')}
+                </div>
+            `;
+        }
+
+        function renderCell(platform, status) {
+            const cellCards = cards.filter(c => c.platform === platform && c.status === status);
+            return `
+                <div class="lane-cell" data-status="${status}" data-platform="${platform}">
+                    <div class="drop-zone" data-status="${status}" data-platform="${platform}">
+                        ${cellCards.map(c => renderCard(c)).join('')}
+                    </div>
+                    ${status === 'backlog' ? `<button class="add-card-btn" onclick="openModal('${platform}', '${status}')">+ Add</button>` : ''}
+                </div>
+            `;
+        }
+
+        function renderCard(card) {
+            const typeEmoji = {
+                post: '📝', thread: '🧵', video: '🎬',
+                story: '📱', article: '📄', newsletter: '📰'
+            };
+            return `
+                <div class="card" draggable="true" data-id="${card.id}" data-platform="${card.platform}">
+                    <div class="card-title">${escapeHtml(card.title)}</div>
+                    <div class="card-meta">
+                        <span class="card-tag">${typeEmoji[card.type] || '📝'} ${card.type}</span>
+                        <span>${card.date || ''}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function setupEventListeners() {
+            document.addEventListener('click', (e) => {
+                document.getElementById('context-menu').classList.remove('active');
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closeModal();
+            });
+
+            document.addEventListener('contextmenu', (e) => {
+                const card = e.target.closest('.card');
+                if (card) {
+                    e.preventDefault();
+                    currentCardId = card.dataset.id;
+                    const menu = document.getElementById('context-menu');
+                    menu.style.left = e.pageX + 'px';
+                    menu.style.top = e.pageY + 'px';
+                    menu.classList.add('active');
+                }
+            });
+
+            document.addEventListener('dblclick', (e) => {
+                const card = e.target.closest('.card');
+                if (card) {
+                    currentCardId = card.dataset.id;
+                    editCard();
+                }
+            });
+        }
+
+        function setupDragAndDrop() {
+            document.querySelectorAll('.card').forEach(card => {
+                card.addEventListener('dragstart', (e) => {
+                    draggedCard = card;
+                    card.classList.add('dragging');
+                });
+
+                card.addEventListener('dragend', (e) => {
+                    card.classList.remove('dragging');
+                    draggedCard = null;
+                });
+            });
+
+            document.querySelectorAll('.drop-zone').forEach(zone => {
+                zone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    zone.classList.add('drag-over');
+                });
+
+                zone.addEventListener('dragleave', () => {
+                    zone.classList.remove('drag-over');
+                });
+
+                zone.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    zone.classList.remove('drag-over');
+
+                    if (draggedCard) {
+                        const newPlatform = zone.dataset.platform;
+                        const newStatus = zone.dataset.status;
+                        const cardId = draggedCard.dataset.id;
+
+                        try {
+                            await fetch(`${API_BASE}/cards/${cardId}/move`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ platform: newPlatform, status: newStatus })
+                            });
+
+                            const card = cards.find(c => c.id === cardId);
+                            if (card) {
+                                card.platform = newPlatform;
+                                card.status = newStatus;
+                            }
+                            renderBoard();
+                            updateStats();
+                            showToast('Card moved');
+                        } catch (err) {
+                            showToast('Failed to move card', 'error');
+                        }
+                    }
+                });
+            });
+        }
+
+        function openModal(platform, status) {
+            document.getElementById('card-id').value = '';
+            document.getElementById('card-platform').value = platform;
+            document.getElementById('card-status').value = status;
+            document.getElementById('card-title').value = '';
+            document.getElementById('card-description').value = '';
+            document.getElementById('card-type').value = 'post';
+            document.getElementById('card-date').value = '';
+            document.getElementById('card-priority').value = 'medium';
+            document.getElementById('modal-title').textContent = 'Add Content';
+            document.getElementById('modal').classList.add('active');
+            setTimeout(() => document.getElementById('card-title').focus(), 100);
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.remove('active');
+        }
+
+        async function saveCard() {
+            const id = document.getElementById('card-id').value;
+            const card = {
+                platform: document.getElementById('card-platform').value,
+                status: document.getElementById('card-status').value,
+                title: document.getElementById('card-title').value,
+                description: document.getElementById('card-description').value,
+                type: document.getElementById('card-type').value,
+                date: document.getElementById('card-date').value,
+                priority: document.getElementById('card-priority').value
+            };
+
+            if (!card.title) {
+                showToast('Please enter a title', 'error');
+                return;
+            }
+
+            try {
+                if (id) {
+                    await fetch(`${API_BASE}/cards/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(card)
+                    });
+                    showToast('Card updated');
+                } else {
+                    const res = await fetch(`${API_BASE}/cards`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(card)
+                    });
+                    const newCard = await res.json();
+                    cards.push(newCard);
+                    showToast('Card created');
+                }
+
+                await loadCards();
+                renderBoard();
+                closeModal();
+            } catch (err) {
+                showToast('Failed to save card', 'error');
+            }
+        }
+
+        async function editCard() {
+            const card = cards.find(c => c.id === currentCardId);
+            if (!card) return;
+
+            document.getElementById('card-id').value = card.id;
+            document.getElementById('card-platform').value = card.platform;
+            document.getElementById('card-status').value = card.status;
+            document.getElementById('card-title').value = card.title;
+            document.getElementById('card-description').value = card.description || '';
+            document.getElementById('card-type').value = card.type || 'post';
+            document.getElementById('card-date').value = card.date || '';
+            document.getElementById('card-priority').value = card.priority || 'medium';
+            document.getElementById('modal-title').textContent = 'Edit Content';
+            document.getElementById('modal').classList.add('active');
+        }
+
+        async function duplicateCard() {
+            const card = cards.find(c => c.id === currentCardId);
+            if (!card) return;
+
+            try {
+                const newCard = { ...card, title: card.title + ' (copy)' };
+                delete newCard.id;
+                await fetch(`${API_BASE}/cards`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newCard)
+                });
+                await loadCards();
+                renderBoard();
+                showToast('Card duplicated');
+            } catch (err) {
+                showToast('Failed to duplicate card', 'error');
+            }
+        }
+
+        async function deleteCard() {
+            if (!confirm('Delete this card?')) return;
+
+            try {
+                await fetch(`${API_BASE}/cards/${currentCardId}`, { method: 'DELETE' });
+                cards = cards.filter(c => c.id !== currentCardId);
+                renderBoard();
+                updateStats();
+                showToast('Card deleted');
+            } catch (err) {
+                showToast('Failed to delete card', 'error');
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('total-cards').textContent = cards.length + ' items';
+            document.getElementById('scheduled-count').textContent = cards.filter(c => c.status === 'scheduled').length + ' scheduled';
+            document.getElementById('published-count').textContent = cards.filter(c => c.status === 'published').length + ' published';
+        }
+
+        function showToast(message, type = 'success') {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        init();
+    </script>
+</body>
+</html>
