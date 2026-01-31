@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ryan's Social Media Kanban</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header .stats {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+            color: #888;
+        }
+
+        .header .stats span {
+            background: rgba(255,255,255,0.1);
+            padding: 5px 12px;
+            border-radius: 20px;
+        }
+
+        .board-container {
+            overflow-x: auto;
+            padding-bottom: 20px;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: 200px repeat(5, 280px);
+            gap: 0;
+            min-width: max-content;
+        }
+
+        .column-headers {
+            display: contents;
+        }
+
+        .column-header {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            font-weight: 600;
+            text-align: center;
+            border-bottom: 2px solid;
+            position: sticky;
+            top: 0;
+        }
+
+        .column-header:nth-child(1) { border-color: transparent; background: transparent; }
+        .column-header:nth-child(2) { border-color: #6366f1; }
+        .column-header:nth-child(3) { border-color: #f59e0b; }
+        .column-header:nth-child(4) { border-color: #8b5cf6; }
+        .column-header:nth-child(5) { border-color: #10b981; }
+        .column-header:nth-child(6) { border-color: #3b82f6; }
+
+        .swim-lane {
+            display: contents;
+        }
+
+        .lane-label {
+            background: rgba(255,255,255,0.03);
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 500;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            position: sticky;
+            left: 0;
+            z-index: 1;
+        }
+
+        .lane-label .icon {
+            font-size: 20px;
+        }
+
+        .lane-label .name {
+            font-size: 13px;
+        }
+
+        .lane-cell {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            min-height: 120px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .lane-cell:hover {
+            background: rgba(255,255,255,0.04);
+        }
+
+        .card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 12px;
+            cursor: grab;
+            transition: all 0.2s;
+            border-left: 3px solid;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .card.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+
+        .card-title {
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .card-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: #888;
+        }
+
+        .card-tag {
+            background: rgba(255,255,255,0.1);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+        }
+
+        /* Platform colors */
+        .card[data-platform="x"] { border-left-color: #1da1f2; }
+        .card[data-platform="instagram"] { border-left-color: #e1306c; }
+        .card[data-platform="youtube"] { border-left-color: #ff0000; }
+        .card[data-platform="tiktok"] { border-left-color: #00f2ea; }
+        .card[data-platform="substack-ai"] { border-left-color: #ff6719; }
+        .card[data-platform="substack-rtl"] { border-left-color: #ff6719; }
+        .card[data-platform="medium"] { border-left-color: #00ab6c; }
+
+        .lane-x .lane-label { background: rgba(29, 161, 242, 0.1); }
+        .lane-instagram .lane-label { background: rgba(225, 48, 108, 0.1); }
+        .lane-youtube .lane-label { background: rgba(255, 0, 0, 0.1); }
+        .lane-tiktok .lane-label { background: rgba(0, 242, 234, 0.1); }
+        .lane-substack-ai .lane-label { background: rgba(255, 103, 25, 0.1); }
+        .lane-substack-rtl .lane-label { background: rgba(255, 103, 25, 0.1); }
+        .lane-medium .lane-label { background: rgba(0, 171, 108, 0.1); }
+
+        .add-card-btn {
+            background: transparent;
+            border: 2px dashed rgba(255,255,255,0.2);
+            border-radius: 8px;
+            padding: 10px;
+            color: rgba(255,255,255,0.4);
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .add-card-btn:hover {
+            border-color: rgba(255,255,255,0.4);
+            color: rgba(255,255,255,0.6);
+        }
+
+        .drop-zone {
+            flex: 1;
+            min-height: 60px;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .drop-zone.drag-over {
+            background: rgba(99, 102, 241, 0.2);
+            border: 2px dashed #6366f1;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: #1e1e2e;
+            border-radius: 12px;
+            padding: 24px;
+            width: 400px;
+            max-width: 90%;
+        }
+
+        .modal h3 {
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+
+        .modal input, .modal textarea, .modal select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .modal textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal-buttons button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: #fff;
+        }
+
+        /* Context menu */
+        .context-menu {
+            display: none;
+            position: fixed;
+            background: #2d2d3d;
+            border-radius: 8px;
+            padding: 8px 0;
+            min-width: 150px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            z-index: 1001;
+        }
+
+        .context-menu.active {
+            display: block;
+        }
+
+        .context-menu button {
+            display: block;
+            width: 100%;
+            padding: 10px 16px;
+            text-align: left;
+            background: none;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .context-menu button:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .context-menu button.danger {
+            color: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 Ryan's Social Media Command Center</h1>
+        <div class="stats">
+            <span id="total-cards">0 items</span>
+            <span id="scheduled-count">0 scheduled</span>
+            <span id="published-count">0 published</span>
+        </div>
+    </div>
+
+    <div class="board-container">
+        <div class="board" id="board">
+            <!-- Column Headers -->
+            <div class="column-headers">
+                <div class="column-header"></div>
+                <div class="column-header">📥 Backlog</div>
+                <div class="column-header">✏️ In Progress</div>
+                <div class="column-header">👀 Review</div>
+                <div class="column-header">📅 Scheduled</div>
+                <div class="column-header">✅ Published</div>
+            </div>
+
+            <!-- X / Twitter -->
+            <div class="swim-lane lane-x" data-platform="x">
+                <div class="lane-label">
+                    <span class="icon">𝕏</span>
+                    <span class="name">X / Twitter</span>
+                </div>
+                <div class="lane-cell" data-status="backlog" data-platform="x">
+                    <div class="drop-zone"></div>
+                    <button class="add-card-btn" onclick="openModal('x', 'backlog')">+ Add</button>
+                </div>
+                <div class="lane-cell" data-status="progress" data-platform="x">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="review" data-platform="x">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="scheduled" data-platform="x">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="published" data-platform="x">
+                    <div class="drop-zone"></div>
+                </div>
+            </div>
+
+            <!-- Instagram -->
+            <div class="swim-lane lane-instagram" data-platform="instagram">
+                <div class="lane-label">
+                    <span class="icon">📸</span>
+                    <span class="name">Instagram</span>
+                </div>
+                <div class="lane-cell" data-status="backlog" data-platform="instagram">
+                    <div class="drop-zone"></div>
+                    <button class="add-card-btn" onclick="openModal('instagram', 'backlog')">+ Add</button>
+                </div>
+                <div class="lane-cell" data-status="progress" data-platform="instagram">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="review" data-platform="instagram">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="scheduled" data-platform="instagram">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="published" data-platform="instagram">
+                    <div class="drop-zone"></div>
+                </div>
+            </div>
+
+            <!-- YouTube -->
+            <div class="swim-lane lane-youtube" data-platform="youtube">
+                <div class="lane-label">
+                    <span class="icon">▶️</span>
+                    <span class="name">YouTube</span>
+                </div>
+                <div class="lane-cell" data-status="backlog" data-platform="youtube">
+                    <div class="drop-zone"></div>
+                    <button class="add-card-btn" onclick="openModal('youtube', 'backlog')">+ Add</button>
+                </div>
+                <div class="lane-cell" data-status="progress" data-platform="youtube">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="review" data-platform="youtube">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="scheduled" data-platform="youtube">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="published" data-platform="youtube">
+                    <div class="drop-zone"></div>
+                </div>
+            </div>
+
+            <!-- TikTok -->
+            <div class="swim-lane lane-tiktok" data-platform="tiktok">
+                <div class="lane-label">
+                    <span class="icon">🎵</span>
+                    <span class="name">TikTok</span>
+                </div>
+                <div class="lane-cell" data-status="backlog" data-platform="tiktok">
+                    <div class="drop-zone"></div>
+                    <button class="add-card-btn" onclick="openModal('tiktok', 'backlog')">+ Add</button>
+                </div>
+                <div class="lane-cell" data-status="progress" data-platform="tiktok">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="review" data-platform="tiktok">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="scheduled" data-platform="tiktok">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="published" data-platform="tiktok">
+                    <div class="drop-zone"></div>
+                </div>
+            </div>
+
+            <!-- SubStack AInsights -->
+            <div class="swim-lane lane-substack-ai" data-platform="substack-ai">
+                <div class="lane-label">
+                    <span class="icon">📰</span>
+                    <span class="name">SubStack<br><small>AInsights</small></span>
+                </div>
+                <div class="lane-cell" data-status="backlog" data-platform="substack-ai">
+                    <div class="drop-zone"></div>
+                    <button class="add-card-btn" onclick="openModal('substack-ai', 'backlog')">+ Add</button>
+                </div>
+                <div class="lane-cell" data-status="progress" data-platform="substack-ai">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="review" data-platform="substack-ai">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="scheduled" data-platform="substack-ai">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="published" data-platform="substack-ai">
+                    <div class="drop-zone"></div>
+                </div>
+            </div>
+
+            <!-- SubStack RyanTechLabs -->
+            <div class="swim-lane lane-substack-rtl" data-platform="substack-rtl">
+                <div class="lane-label">
+                    <span class="icon">📰</span>
+                    <span class="name">SubStack<br><small>RyanTechLabs</small></span>
+                </div>
+                <div class="lane-cell" data-status="backlog" data-platform="substack-rtl">
+                    <div class="drop-zone"></div>
+                    <button class="add-card-btn" onclick="openModal('substack-rtl', 'backlog')">+ Add</button>
+                </div>
+                <div class="lane-cell" data-status="progress" data-platform="substack-rtl">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="review" data-platform="substack-rtl">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="scheduled" data-platform="substack-rtl">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="published" data-platform="substack-rtl">
+                    <div class="drop-zone"></div>
+                </div>
+            </div>
+
+            <!-- Medium -->
+            <div class="swim-lane lane-medium" data-platform="medium">
+                <div class="lane-label">
+                    <span class="icon">📝</span>
+                    <span class="name">Medium</span>
+                </div>
+                <div class="lane-cell" data-status="backlog" data-platform="medium">
+                    <div class="drop-zone"></div>
+                    <button class="add-card-btn" onclick="openModal('medium', 'backlog')">+ Add</button>
+                </div>
+                <div class="lane-cell" data-status="progress" data-platform="medium">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="review" data-platform="medium">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="scheduled" data-platform="medium">
+                    <div class="drop-zone"></div>
+                </div>
+                <div class="lane-cell" data-status="published" data-platform="medium">
+                    <div class="drop-zone"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal-overlay" id="modal">
+        <div class="modal">
+            <h3 id="modal-title">Add Content</h3>
+            <input type="hidden" id="card-id">
+            <input type="hidden" id="card-platform">
+            <input type="hidden" id="card-status">
+            <input type="text" id="card-title" placeholder="Title / Content idea">
+            <textarea id="card-description" placeholder="Description or full content..."></textarea>
+            <select id="card-type">
+                <option value="post">Post</option>
+                <option value="thread">Thread</option>
+                <option value="video">Video</option>
+                <option value="story">Story</option>
+                <option value="article">Article</option>
+                <option value="newsletter">Newsletter</option>
+            </select>
+            <input type="date" id="card-date" placeholder="Scheduled date">
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveCard()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Context Menu -->
+    <div class="context-menu" id="context-menu">
+        <button onclick="editCard()">✏️ Edit</button>
+        <button onclick="duplicateCard()">📋 Duplicate</button>
+        <button class="danger" onclick="deleteCard()">🗑️ Delete</button>
+    </div>
+
+    <script>
+        let cards = JSON.parse(localStorage.getItem('kanban-cards') || '[]');
+        let currentCardId = null;
+        let draggedCard = null;
+
+        function init() {
+            renderCards();
+            setupDragAndDrop();
+            updateStats();
+
+            // Close context menu on click outside
+            document.addEventListener('click', () => {
+                document.getElementById('context-menu').classList.remove('active');
+            });
+
+            // Close modal on escape
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closeModal();
+            });
+        }
+
+        function renderCards() {
+            // Clear existing cards
+            document.querySelectorAll('.card').forEach(c => c.remove());
+
+            cards.forEach(card => {
+                const cell = document.querySelector(`.lane-cell[data-platform="${card.platform}"][data-status="${card.status}"]`);
+                if (cell) {
+                    const cardEl = createCardElement(card);
+                    const dropZone = cell.querySelector('.drop-zone');
+                    dropZone.appendChild(cardEl);
+                }
+            });
+
+            updateStats();
+        }
+
+        function createCardElement(card) {
+            const div = document.createElement('div');
+            div.className = 'card';
+            div.draggable = true;
+            div.dataset.id = card.id;
+            div.dataset.platform = card.platform;
+
+            const typeEmoji = {
+                post: '📝',
+                thread: '🧵',
+                video: '🎬',
+                story: '📱',
+                article: '📄',
+                newsletter: '📰'
+            };
+
+            div.innerHTML = `
+                <div class="card-title">${card.title}</div>
+                <div class="card-meta">
+                    <span class="card-tag">${typeEmoji[card.type] || '📝'} ${card.type}</span>
+                    <span>${card.date || ''}</span>
+                </div>
+            `;
+
+            div.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                currentCardId = card.id;
+                const menu = document.getElementById('context-menu');
+                menu.style.left = e.pageX + 'px';
+                menu.style.top = e.pageY + 'px';
+                menu.classList.add('active');
+            });
+
+            div.addEventListener('dblclick', () => {
+                currentCardId = card.id;
+                editCard();
+            });
+
+            return div;
+        }
+
+        function setupDragAndDrop() {
+            document.addEventListener('dragstart', (e) => {
+                if (e.target.classList.contains('card')) {
+                    draggedCard = e.target;
+                    e.target.classList.add('dragging');
+                }
+            });
+
+            document.addEventListener('dragend', (e) => {
+                if (e.target.classList.contains('card')) {
+                    e.target.classList.remove('dragging');
+                    draggedCard = null;
+                }
+            });
+
+            document.querySelectorAll('.drop-zone').forEach(zone => {
+                zone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    zone.classList.add('drag-over');
+                });
+
+                zone.addEventListener('dragleave', () => {
+                    zone.classList.remove('drag-over');
+                });
+
+                zone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    zone.classList.remove('drag-over');
+
+                    if (draggedCard) {
+                        const cell = zone.closest('.lane-cell');
+                        const newPlatform = cell.dataset.platform;
+                        const newStatus = cell.dataset.status;
+                        const cardId = draggedCard.dataset.id;
+
+                        const card = cards.find(c => c.id === cardId);
+                        if (card) {
+                            card.platform = newPlatform;
+                            card.status = newStatus;
+                            saveCards();
+                            renderCards();
+                        }
+                    }
+                });
+            });
+        }
+
+        function openModal(platform, status) {
+            document.getElementById('card-id').value = '';
+            document.getElementById('card-platform').value = platform;
+            document.getElementById('card-status').value = status;
+            document.getElementById('card-title').value = '';
+            document.getElementById('card-description').value = '';
+            document.getElementById('card-type').value = 'post';
+            document.getElementById('card-date').value = '';
+            document.getElementById('modal-title').textContent = 'Add Content';
+            document.getElementById('modal').classList.add('active');
+            document.getElementById('card-title').focus();
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.remove('active');
+        }
+
+        function saveCard() {
+            const id = document.getElementById('card-id').value || Date.now().toString();
+            const card = {
+                id,
+                platform: document.getElementById('card-platform').value,
+                status: document.getElementById('card-status').value,
+                title: document.getElementById('card-title').value,
+                description: document.getElementById('card-description').value,
+                type: document.getElementById('card-type').value,
+                date: document.getElementById('card-date').value
+            };
+
+            if (!card.title) {
+                alert('Please enter a title');
+                return;
+            }
+
+            const existingIndex = cards.findIndex(c => c.id === id);
+            if (existingIndex >= 0) {
+                cards[existingIndex] = card;
+            } else {
+                cards.push(card);
+            }
+
+            saveCards();
+            renderCards();
+            closeModal();
+        }
+
+        function editCard() {
+            const card = cards.find(c => c.id === currentCardId);
+            if (!card) return;
+
+            document.getElementById('card-id').value = card.id;
+            document.getElementById('card-platform').value = card.platform;
+            document.getElementById('card-status').value = card.status;
+            document.getElementById('card-title').value = card.title;
+            document.getElementById('card-description').value = card.description || '';
+            document.getElementById('card-type').value = card.type;
+            document.getElementById('card-date').value = card.date || '';
+            document.getElementById('modal-title').textContent = 'Edit Content';
+            document.getElementById('modal').classList.add('active');
+        }
+
+        function duplicateCard() {
+            const card = cards.find(c => c.id === currentCardId);
+            if (!card) return;
+
+            const newCard = { ...card, id: Date.now().toString(), title: card.title + ' (copy)' };
+            cards.push(newCard);
+            saveCards();
+            renderCards();
+        }
+
+        function deleteCard() {
+            if (confirm('Delete this card?')) {
+                cards = cards.filter(c => c.id !== currentCardId);
+                saveCards();
+                renderCards();
+            }
+        }
+
+        function saveCards() {
+            localStorage.setItem('kanban-cards', JSON.stringify(cards));
+        }
+
+        function updateStats() {
+            document.getElementById('total-cards').textContent = cards.length + ' items';
+            document.getElementById('scheduled-count').textContent = cards.filter(c => c.status === 'scheduled').length + ' scheduled';
+            document.getElementById('published-count').textContent = cards.filter(c => c.status === 'published').length + ' published';
+        }
+
+        // Initialize
+        init();
+    </script>
+</body>
+</html>
